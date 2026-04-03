@@ -28,4 +28,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
+    /** Stored filename key under {@code app.profile.upload-dir}; null if no photo. */
+    private String profileImageKey;
 }

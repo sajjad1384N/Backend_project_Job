@@ -11,4 +11,6 @@ public class UserProfileResponse {
     private String fullName;
     private String email;
     private Role role;
+    /** Relative path under API base, e.g. {@code users/me/avatar}; use with authenticated GET. */
+    private String avatarUrl;
 }

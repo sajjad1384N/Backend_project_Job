@@ -1,5 +1,6 @@
 package com.example.jobportal.repository;
 
+import com.example.jobportal.dto.AdminJobSummaryResponse;
 import com.example.jobportal.entity.Job;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
@@ -7,7 +8,20 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface JobRepository extends JpaRepository<Job, Long> {
+
+    @Query("""
+            SELECT new com.example.jobportal.dto.AdminJobSummaryResponse(
+                j.id, j.title, j.companyName, COUNT(a.id)
+            )
+            FROM Job j
+            LEFT JOIN JobApplication a ON a.job = j
+            GROUP BY j.id, j.title, j.companyName
+            ORDER BY COUNT(a.id) DESC
+            """)
+    List<AdminJobSummaryResponse> findAllWithApplicationCounts();
     @Query("""
             SELECT j FROM Job j
             WHERE (:keyword IS NULL OR
