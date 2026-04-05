@@ -3,6 +3,8 @@ package com.example.jobportal.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -31,4 +33,9 @@ public class User {
 
     /** Stored filename key under {@code app.profile.upload-dir}; null if no photo. */
     private String profileImageKey;
+
+    /** BCrypt hash of the one-time password reset token; cleared after use. */
+    private String passwordResetTokenHash;
+
+    private Instant passwordResetExpiresAt;
 }

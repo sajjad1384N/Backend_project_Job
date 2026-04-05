@@ -5,10 +5,12 @@ import com.example.jobportal.dto.ApplicationStatusUpdateRequest;
 import com.example.jobportal.dto.JobApplicationResponse;
 import com.example.jobportal.dto.PageResponse;
 import com.example.jobportal.service.interfaces.ApplicationService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
@@ -68,6 +71,20 @@ public class ApplicationController {
             return "";
         }
         return filename.substring(i + 1).toLowerCase();
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','RECRUITER')")
+    @GetMapping(value = "/jobs/{jobId}/export", produces = "text/csv;charset=UTF-8")
+    public void exportCsv(@PathVariable Long jobId, HttpServletResponse response) throws IOException {
+        String filename = "applications-" + jobId + ".csv";
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8)
+                        .build()
+                        .toString());
+        applicationService.writeJobApplicationsCsv(jobId, response.getWriter());
     }
 
     @PreAuthorize("hasRole('CANDIDATE')")

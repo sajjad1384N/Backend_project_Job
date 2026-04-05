@@ -19,6 +19,14 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     long countByStatus(ApplicationStatus status);
 
     @Query("""
+            SELECT DISTINCT a FROM JobApplication a
+            JOIN FETCH a.candidate
+            WHERE a.job.id = :jobId
+            ORDER BY a.appliedAt DESC
+            """)
+    List<JobApplication> findWithCandidateByJobId(@Param("jobId") Long jobId);
+
+    @Query("""
             SELECT a FROM JobApplication a
             WHERE a.candidate.id = :candidateId
               AND (:status IS NULL OR a.status = :status)

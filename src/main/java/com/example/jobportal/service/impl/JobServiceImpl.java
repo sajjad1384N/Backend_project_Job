@@ -12,6 +12,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 public class JobServiceImpl implements JobService {
@@ -41,6 +43,7 @@ public class JobServiceImpl implements JobService {
         existing.setDescription(request.getDescription());
         existing.setLocation(request.getLocation());
         existing.setCompanyName(request.getCompanyName());
+        existing.setClosingAt(request.getClosingAt());
 
         return jobMapper.toResponse(jobRepository.save(existing));
     }
@@ -56,7 +59,7 @@ public class JobServiceImpl implements JobService {
     @Override
     public PageResponse<JobResponse> getAll(String keyword, String location, String company, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        var jobsPage = jobRepository.search(keyword, location, company, pageable)
+        var jobsPage = jobRepository.search(keyword, location, company, Instant.now(), pageable)
                 .map(jobMapper::toResponse);
         return PageResponse.from(jobsPage);
     }

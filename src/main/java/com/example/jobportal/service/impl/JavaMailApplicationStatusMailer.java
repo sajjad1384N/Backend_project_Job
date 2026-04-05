@@ -9,6 +9,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -46,6 +49,61 @@ public class JavaMailApplicationStatusMailer implements ApplicationStatusMailer 
             mailSender.send(msg);
         } catch (Exception e) {
             log.warn("Failed to send application status email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Override
+    public void sendNewApplicationNotification(List<String> recruiterEmails, String jobTitle, String companyName,
+                                               String candidateName, String candidateEmail) {
+        if (CollectionUtils.isEmpty(recruiterEmails)) {
+            return;
+        }
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setFrom(fromAddress);
+        msg.setTo(recruiterEmails.toArray(String[]::new));
+        msg.setSubject("New application: " + jobTitle);
+        msg.setText("A candidate has applied for \"" + jobTitle + "\" at " + companyName + ".\n\n"
+                + "Candidate: " + candidateName + " <" + candidateEmail + ">\n\n"
+                + "Open the portal to review applications and download resumes.\n\n"
+                + "— Job Portal");
+        try {
+            mailSender.send(msg);
+        } catch (Exception e) {
+            log.warn("Failed to send new-application notification: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void sendCandidateApplicationConfirmation(String candidateEmail, String candidateName, String jobTitle) {
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setFrom(fromAddress);
+        msg.setTo(candidateEmail);
+        msg.setSubject("Application received — " + jobTitle);
+        msg.setText("Dear " + candidateName + ",\n\n"
+                + "We received your application for \"" + jobTitle + "\".\n\n"
+                + "The hiring team will review your profile and may contact you if there is a match.\n\n"
+                + "— Job Portal");
+        try {
+            mailSender.send(msg);
+        } catch (Exception e) {
+            log.warn("Failed to send candidate confirmation to {}: {}", candidateEmail, e.getMessage());
+        }
+    }
+
+    @Override
+    public void sendPasswordResetEmail(String toEmail, String resetLink) {
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setFrom(fromAddress);
+        msg.setTo(toEmail);
+        msg.setSubject("Reset your Job Portal password");
+        msg.setText("You asked to reset your password.\n\n"
+                + "Open this link (valid for a limited time):\n" + resetLink + "\n\n"
+                + "If you did not request this, you can ignore this email.\n\n"
+                + "— Job Portal");
+        try {
+            mailSender.send(msg);
+        } catch (Exception e) {
+            log.warn("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
         }
     }
 }

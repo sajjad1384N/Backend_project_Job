@@ -5,6 +5,7 @@ import com.example.jobportal.dto.JobApplicationResponse;
 import com.example.jobportal.dto.PageResponse;
 import com.example.jobportal.entity.ApplicationStatus;
 import com.example.jobportal.entity.JobApplication;
+import com.example.jobportal.entity.Role;
 import com.example.jobportal.exception.ResourceAlreadyExistsException;
 import com.example.jobportal.exception.ResourceNotFoundException;
 import com.example.jobportal.mapper.JobApplicationMapper;
@@ -23,7 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.file.Files;
+import java.time.Instant;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -45,6 +49,10 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         var job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+
+        if (job.getClosingAt() != null && !job.getClosingAt().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("This job is no longer accepting applications");
+        }
 
         var candidate = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -68,6 +76,23 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .resumeStorageKey(stored.storageKey())
                 .resumeOriginalFilename(stored.originalFilename())
                 .build());
+
+        try {
+            var recruiters = userRepository.findByRoleIn(List.of(Role.ADMIN, Role.RECRUITER));
+            List<String> emails = recruiters.stream().map(u -> u.getEmail()).distinct().toList();
+            applicationStatusMailer.sendNewApplicationNotification(
+                    emails,
+                    job.getTitle(),
+                    job.getCompanyName(),
+                    candidate.getFullName(),
+                    candidate.getEmail());
+            applicationStatusMailer.sendCandidateApplicationConfirmation(
+                    candidate.getEmail(),
+                    candidate.getFullName(),
+                    job.getTitle());
+        } catch (Exception e) {
+            log.warn("Could not send application notification emails: {}", e.getMessage());
+        }
 
         return mapper.toResponse(saved);
     }
@@ -167,5 +192,44 @@ public class ApplicationServiceImpl implements ApplicationService {
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException("Invalid status. Use APPLIED, SHORTLISTED, or REJECTED");
         }
+    }
+
+    @Override
+    public void writeJobApplicationsCsv(Long jobId, Writer writer) throws IOException {
+        if (!jobRepository.existsById(jobId)) {
+            throw new ResourceNotFoundException("Job not found");
+        }
+        var applications = jobApplicationRepository.findWithCandidateByJobId(jobId);
+        writer.write('\uFEFF');
+        writer.write("id,candidateName,candidateEmail,status,appliedAt,coverLetter,resumeOriginalFilename\n");
+        for (var a : applications) {
+            var c = a.getCandidate();
+            writer.write(Long.toString(a.getId()));
+            writer.write(',');
+            writer.write(csvEscape(c.getFullName()));
+            writer.write(',');
+            writer.write(csvEscape(c.getEmail()));
+            writer.write(',');
+            writer.write(a.getStatus().name());
+            writer.write(',');
+            writer.write(csvEscape(a.getAppliedAt().toString()));
+            writer.write(',');
+            writer.write(csvEscape(a.getCoverLetter()));
+            writer.write(',');
+            writer.write(csvEscape(a.getResumeOriginalFilename()));
+            writer.write('\n');
+        }
+        writer.flush();
+    }
+
+    private static String csvEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        String t = value.replace("\r\n", "\n").replace("\r", "\n");
+        if (t.contains(",") || t.contains("\"") || t.contains("\n")) {
+            return "\"" + t.replace("\"", "\"\"") + "\"";
+        }
+        return t;
     }
 }

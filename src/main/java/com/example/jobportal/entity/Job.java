@@ -3,6 +3,8 @@ package com.example.jobportal.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "jobs")
 @Getter
@@ -27,4 +29,7 @@ public class Job {
 
     @Column(nullable = false)
     private String companyName;
+
+    /** When set and in the past, the job no longer accepts applications. */
+    private Instant closingAt;
 }

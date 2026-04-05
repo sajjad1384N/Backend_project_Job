@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface JobRepository extends JpaRepository<Job, Long> {
@@ -30,9 +31,11 @@ public interface JobRepository extends JpaRepository<Job, Long> {
                    LOWER(j.companyName) LIKE LOWER(CONCAT('%', :keyword, '%')))
               AND (:location IS NULL OR LOWER(j.location) LIKE LOWER(CONCAT('%', :location, '%')))
               AND (:company IS NULL OR LOWER(j.companyName) LIKE LOWER(CONCAT('%', :company, '%')))
+              AND (j.closingAt IS NULL OR j.closingAt > :now)
             """)
     Page<Job> search(@Param("keyword") String keyword,
                      @Param("location") String location,
                      @Param("company") String company,
+                     @Param("now") Instant now,
                      Pageable pageable);
 }
