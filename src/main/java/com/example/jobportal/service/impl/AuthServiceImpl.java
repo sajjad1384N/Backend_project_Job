@@ -37,8 +37,11 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final ApplicationStatusMailer applicationStatusMailer;
 
-    @Value("${app.mail.enabled:false}")
-    private boolean mailEnabled;
+    /**
+     * If JavaMail send fails, log the reset link (dev only). No effect when {@link ApplicationStatusMailer} is NoOp.
+     */
+    @Value("${jobportal.mail.log-reset-link-when-disabled:true}")
+    private boolean logResetLinkWhenMailDisabled;
 
     @Value("${app.frontend.base-url:http://localhost:4200}")
     private String frontendBaseUrl;
@@ -103,10 +106,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
-        if (!mailEnabled) {
-            log.warn("Password reset requested but app.mail.enabled=false; email not sent");
-            return;
-        }
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
             String raw = UUID.randomUUID().toString().replace("-", "")
                     + UUID.randomUUID().toString().replace("-", "");
@@ -116,10 +115,16 @@ public class AuthServiceImpl implements AuthService {
             String base = frontendBaseUrl.replaceAll("/$", "");
             String link = base + "/reset-password?token=" + URLEncoder.encode(raw, StandardCharsets.UTF_8)
                     + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
+
             try {
                 applicationStatusMailer.sendPasswordResetEmail(user.getEmail(), link);
             } catch (Exception e) {
                 log.warn("Could not send password reset email: {}", e.getMessage());
+                if (logResetLinkWhenMailDisabled) {
+                    log.info(
+                            "Password reset (SMTP send failed; dev fallback): open within 1 hour — {}",
+                            link);
+                }
             }
         });
     }

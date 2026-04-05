@@ -11,17 +11,19 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import jakarta.mail.AuthenticationFailedException;
+
 import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.mail.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "jobportal.mail.enabled", havingValue = "true")
 public class JavaMailApplicationStatusMailer implements ApplicationStatusMailer {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.mail.from:noreply@jobportal.local}")
+    @Value("${jobportal.mail.from:noreply@jobportal.local}")
     private String fromAddress;
 
     @Override
@@ -104,6 +106,38 @@ public class JavaMailApplicationStatusMailer implements ApplicationStatusMailer 
             mailSender.send(msg);
         } catch (Exception e) {
             log.warn("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
+            logGmailAuthHintsIfNeeded(e);
+            throw new IllegalStateException("Could not send password reset email", e);
         }
+    }
+
+    /**
+     * Gmail returns "Authentication failed" when the password is not a valid App Password or username/from mismatch.
+     */
+    private static void logGmailAuthHintsIfNeeded(Throwable e) {
+        Throwable cur = e;
+        for (int depth = 0; depth < 8 && cur != null; depth++) {
+            if (cur instanceof AuthenticationFailedException) {
+                logGmailHint();
+                return;
+            }
+            String msg = cur.getMessage();
+            if (msg != null && (msg.contains("Authentication failed")
+                    || msg.contains("535")
+                    || msg.contains("534"))) {
+                logGmailHint();
+                return;
+            }
+            cur = cur.getCause();
+        }
+    }
+
+    private static void logGmailHint() {
+        log.warn(
+                "Gmail SMTP authentication: use spring.mail.username = your full Gmail address; "
+                        + "spring.mail.password = 16-character App Password (Google Account → Security → "
+                        + "2-Step Verification → App passwords). Do not use your normal Gmail password. "
+                        + "jobportal.mail.from must match that Gmail account. "
+                        + "Or set MAIL_USERNAME and MAIL_PASSWORD env vars.");
     }
 }

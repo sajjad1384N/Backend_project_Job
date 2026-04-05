@@ -31,9 +31,9 @@ This document lists **optional features** you can add to the existing stack (**A
 
 - **User value:** Recruiters see applications immediately in inbox.
 - **Backend:** After successful `apply()`, call mailer with job title + candidate summary (no resume in email; link to portal).
-- **Config:** `app.mail.enabled=true` and SMTP already sketched in `application.properties`.
+- **Config:** `jobportal.mail.enabled=true` and SMTP in `application.properties` (avoid `APP_MAIL_ENABLED` env — it maps to deprecated `app.mail.enabled`).
 - **Effort:** Small–medium.
-- **Implemented:** `ApplicationStatusMailer` sends to all `ADMIN`/`RECRUITER` emails plus candidate confirmation when `app.mail.enabled=true`.
+- **Implemented:** `ApplicationStatusMailer` sends to all `ADMIN`/`RECRUITER` emails plus candidate confirmation when `jobportal.mail.enabled=true`.
 
 ### 3. Job closing date + “Closed” jobs — **Done** (2026-04-03)
 
