@@ -33,8 +33,8 @@ Set these in the Render dashboard (**Environment** tab). Do **not** commit secre
 |-----|-------------------|
 | `SPRING_PROFILES_ACTIVE` | `prod` |
 | `SPRING_DATASOURCE_URL` | `jdbc:mysql://HOST:3306/DB?useSSL=true&serverTimezone=UTC` |
-| `SPRING_DATASOURCE_USERNAME` | DB user |
-| `SPRING_DATASOURCE_PASSWORD` | DB password |
+| `SPRING_DATASOURCE_USERNAME` | DB user from your provider (**required** — if missing, the app used to fall back to a local dev name and MySQL returned “Access denied”) |
+| `SPRING_DATASOURCE_PASSWORD` | DB password (**required** in prod — same as above) |
 | `APP_JWT_SECRET` | Long random string (new for production; not your dev key) |
 | `APP_CORS_ALLOWED_ORIGINS` | `https://YOUR-STATIC-SITE.onrender.com` (exact origin, no trailing slash) |
 | `APP_FRONTEND_BASE_URL` | `https://YOUR-STATIC-SITE.onrender.com` (password-reset links) |
@@ -94,3 +94,18 @@ Use your **actual** Web Service hostname. Commit, push, and let Render rebuild t
 - **`application-prod.properties`** — `server.forward-headers-strategy=framework` for HTTPS behind Render’s proxy.
 
 See also **`DEPLOYMENT.md`** for general env and security notes.
+
+## 6. Troubleshooting deployment logs
+
+### `Cannot resolve reference to bean 'jpaSharedEM_entityManagerFactory'` (and `userRepository`)
+
+That message is almost never the real root cause. Spring Data JPA wires repositories to a shared `EntityManager` only **after** Hibernate’s `entityManagerFactory` starts. Scroll **up** in the Render log for the **first** `Caused by:` — typical cases:
+
+| Root cause | What to do |
+|------------|------------|
+| **No DB URL on Render** | You must set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. If they are missing, the app falls back to `localhost` in `application.properties`, which does not exist inside the Render container → connection failure → EMF never starts. |
+| **DB unreachable / SSL** | Allow Render’s outbound access to your MySQL host; use the provider’s required JDBC params (e.g. `useSSL=true`, `sslMode=REQUIRED`). |
+| **`ddl-auto=validate` on an empty database** | Hibernate exits before the schema exists; EMF fails; you then see the `jpaSharedEM_entityManagerFactory` / `userRepository` error. Use `update` for the first deploy, or set Render env `SPRING_JPA_HIBERNATE_DDL_AUTO=update`, then switch to `validate` when the schema is stable. |
+| **`Access denied for user 'Sajjad'`** | Older builds used a local dev username when env vars were missing. Pull the latest code (no hardcoded DB user in the default config), set **`SPRING_DATASOURCE_URL`**, **`SPRING_DATASOURCE_USERNAME`**, and **`SPRING_DATASOURCE_PASSWORD`** to your provider’s values, **`SPRING_PROFILES_ACTIVE=prod`**, save env vars, and redeploy. |
+
+After fixing the underlying error, redeploy and confirm the log shows a clean Spring banner and no Hibernate connection exception above the repository line.
